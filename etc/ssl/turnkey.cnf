@@ -3,8 +3,6 @@
 # Based on the SSLeay example configuration file.
 #
 
-RANDFILE                = /dev/urandom
-
 [ req ]
 default_bits            = 2048
 default_keyfile         = cert.pem
