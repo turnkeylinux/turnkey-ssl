@@ -71,8 +71,8 @@ GEN_DH=false
 DH_ONLY=false
 
 clean_up() { # Perform pre-exit housekeeping
-  rm -f $TMPFILE $TMPOUT
-  return
+    [[ $DEBUG != y ]] || return
+    rm -f $TMPFILE $TMPOUT
 }
 
 info() { echo "INFO [$PROGNAME]: $@"; }
