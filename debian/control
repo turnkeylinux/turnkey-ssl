@@ -1,0 +1,13 @@
+Source: turnkey-ssl
+Section: misc
+Priority: optional
+Maintainer: Jeremy Davis <jeremy@turnkeylinux.org>
+Build-Depends:
+ debhelper (>= 10),
+Standards-Version: 4.0.0
+
+Package: turnkey-ssl
+Architecture: any
+Depends:
+ ${misc:Depends},
+Description: Simple TurnKey tool for creating self-signed SSL/TLS certificates
