@@ -207,7 +207,10 @@ create_temporary_cnf() {
   if [[ $IP == true ]]; then
     for addr in $(hostname -I) '127.0.0.1'; do add_san "$addr"; add_ip "$addr"; done
   fi
-
+  # truncate common name if it's too long for openssl
+  if [[ "${#commonName}" -gt 18 ]]; then
+     commonName="${commonName:0:18}"
+  fi
   sed -i "s#@HostName@#\"$commonName\"#" $TMPFILE
 }
 
