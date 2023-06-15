@@ -15,7 +15,7 @@
   # GNU General Public License at (http://www.gnu.org/licenses/) for
   # more details.
 
-# Usage: turnkey-make-ssl-cert [-h|--help] [-o|--out file] [-d|--default] [-w|--wild] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force-overwrite] [-r|--csr] FQDN .. [FQDN]
+# Usage: turnkey-make-ssl-cert [-h|--help] [-o|--out file] [-d|--default] [-w|--wild] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force] [-r|--csr] FQDN .. [FQDN]
 
 # Purpose:
 
@@ -98,33 +98,33 @@ signal_exit() { # Handle trapped signals
 
 usage() {
 
-cat << _EOF_
-Usage: $PROGNAME [-o|--out file] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force-overwrite] FQDN .. [FQDN]
+cat <<EOF
+Usage: $PROGNAME [-o|--out file] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force] FQDN .. [FQDN]
   Generate a certificate/key pair using the list of FQDNs.
 
-Usage: $PROGNAME [-d|--default] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force-overwrite] [-b|--dh-bits DH_BITS]
+Usage: $PROGNAME [-d|--default] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force]
   Generate the default cert.crt, cert.key, dhparam.pem file and default cert.pem file; using the hostname.
 
-Usage: $PROGNAME [-o|--out file] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force-overwrite] [-w|--wild] domainName .. [domainName]
+Usage: $PROGNAME [-o|--out file] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force] [-w|--wild] domainName .. [domainName]
   Generate a wildcard certificate for the list of domains.
 
-Usage: $PROGNAME [-d|--default] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force-overwrite] [-r|--csr] FQDN .. [FQDN]
+Usage: $PROGNAME [-d|--default] [-t|--template file] [-i|--ip] [-v|--verbose] [-f|--force] [-r|--csr] FQDN .. [FQDN]
   Generate an optional certificate signing request for the list of FQDNs.
 
-Usage: $PROGNAME -p|--dh-params-only [-b|--dh-bits DH_BITS]
-  Generate just a new dhparam.pem file of bit size DH_BITS. Also rebuilds the default cerm.pem file with update DH params.
+Usage: $PROGNAME -p|--dh-only
+  Generate just a new dhparam.pem file. Also rebuilds the default cerm.pem file with update DH params.
 
 Usage: $PROGNAME [-h|--help]
   Display the help message and exit.
 
-_EOF_
+EOF
 
   return
 }
 
 help_message() {
 
-cat << _EOF_
+cat <<EOF
 
 $PROGNAME ver. $VERSION
 "Make server cert for TurnKey GNU/Linux appliance"
@@ -133,7 +133,7 @@ $(usage)
 
       Options:
       -h, --help              Display this help message and exit
-      -o, --out [/path/]file  Write certificate to alternate location
+      -o, --out [/PATH/]FILE  Write certificate to alternate location
       -d, --default           Generate default cert, key & dhparams files
                                 plus a combined file
                                 /etc/ssl/private/cert.pem
@@ -151,7 +151,7 @@ $(usage)
 
       NOTE: You must be the superuser to run this script.
 
-_EOF_
+EOF
 
 return
 }
@@ -251,7 +251,7 @@ while [[ -n $1 ]]; do
 done
 
 if [[ $DH_ONLY == true ]]; then
-    warning "--dh-params-only switch used, no cert or key files will be generated."
+    warning "--dh-only switch used, no cert or key files will be generated."
 fi
 
 expiry_days $EXPIRY
