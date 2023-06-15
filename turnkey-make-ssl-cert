@@ -64,9 +64,6 @@ REQUEST=false
 WILD=false
 OVERWRITE=false
 EXPIRY=10y
-# Unless set via env var; set default Diffie-Hellman bit size as 1024
-DH_BITS=${DH_BITS:-2048}
-DH_BITS_REC=2048 # minimum recommended DH bit size
 GEN_DH=false
 DH_ONLY=false
 
@@ -79,7 +76,7 @@ warning() { echo "WARNING [$PROGNAME]: $@" >&2 ; }
 
 error_exit() {
     echo -e ERROR [${PROGNAME}]: ${1:-"Unknown Error"} >&2
-    if [ $2 ] && [ -f $2 ]; then
+    if [[ $2 ]] && [[ -f $2 ]]; then
         cat $2 >&2
     fi
     clean_up
@@ -93,12 +90,9 @@ graceful_exit() {
 
 signal_exit() { # Handle trapped signals
     case $1 in
-        INT)
-            error_exit "Program interrupted by user" ;;
-        TERM)
-            echo -e "\n$PROGNAME: Program terminated" >&2 ; graceful_exit ;;
-        *)
-            error_exit "Terminating on unknown signal" ;;
+        INT)    error_exit "Program interrupted by user";;
+        TERM)   echo -e "\n$PROGNAME: Program terminated" >&2; graceful_exit;;
+        *)      error_exit "Terminating on unknown signal";;
     esac
 }
 
@@ -163,7 +157,7 @@ return
 }
 
 add_san() {
-    if [[ ! "$sans" =~ " $1 " ]]; then        # skip duplicates
+    if [[ ! "$sans" =~ " $1 " ]]; then          # skip duplicates
         echo "DNS.$((n++)) = $1" >> $TMPFILE    # add subject alternate name
         sans+="$1 "
     fi
@@ -212,7 +206,7 @@ create_temporary_cnf() {
 
 expiry_days() {
     num="${1//[dmy]}"
-    case $1 in
+    case $num in
         '')
             error_exit "Expiry date not set"
             ;;
@@ -261,9 +255,6 @@ if [[ $DH_ONLY == true ]]; then
 fi
 
 expiry_days $EXPIRY
-
-# Exit if OpenSSL is not available
-which openssl > /dev/null || error_exit "OpenSSL is not installed."
 
 # Check for root UID
 if [[ $(id -u) != 0 ]]; then
