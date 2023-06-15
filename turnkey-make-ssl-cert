@@ -78,25 +78,28 @@ info() { echo "INFO [$PROGNAME]: $@"; }
 warning() { echo "WARNING [$PROGNAME]: $@" >&2 ; }
 
 error_exit() {
-  echo -e ERROR [${PROGNAME}]: ${1:-"Unknown Error"} >&2
-  if [ $2 ] && [ -f $2 ]; then
-    cat $2 >&2
-  fi
-  clean_up
-  exit 1
+    echo -e ERROR [${PROGNAME}]: ${1:-"Unknown Error"} >&2
+    if [ $2 ] && [ -f $2 ]; then
+        cat $2 >&2
+    fi
+    clean_up
+    exit 1
 }
 
 graceful_exit() {
-  clean_up
-  exit
+    clean_up
+    exit
 }
 
 signal_exit() { # Handle trapped signals
-  case $1 in
-    INT)    error_exit "Program interrupted by user" ;;
-    TERM)   echo -e "\n$PROGNAME: Program terminated" >&2 ; graceful_exit ;;
-    *)      error_exit "Terminating on unknown signal" ;;
-  esac
+    case $1 in
+        INT)
+            error_exit "Program interrupted by user" ;;
+        TERM)
+            echo -e "\n$PROGNAME: Program terminated" >&2 ; graceful_exit ;;
+        *)
+            error_exit "Terminating on unknown signal" ;;
+    esac
 }
 
 usage() {
@@ -142,23 +145,15 @@ $(usage)
                                 /etc/ssl/private/cert.pem
       -e, --expiry            Set certificate expiry date
                                 default: 10y
-      -b, --dh-bits DH_BITS   Generate a Diffie-Hellman parameters file; bit
-                                size: DH_BITS (can also be set via env var)
-                                /etc/ssl/private/dhparams.pem
-                                valid options: 1024 | 2048 | 4096
-                                default: $DH_BITS
-                                recommended: $DH_BITS_REC
-                                Note that as of v1.4 an audited dh_params is
-                                provided (as per RFC7919)
-      -p, --dh-params-only    Generate a Diffie-Hellman parameters file only
+      -p, --dh-only           Generate a Diffie-Hellman parameters file only
                                 (Also rebuilds default cert.pem file)
       -r, --csr               Generate a certificate signing request
       -w, --wild              Generate wildcard certificate
-      -t, --template file     Use alternate template file
+      -t, --template FILE     Use alternate template file
                                 default: /etc/ssl/turnkey.cnf
       -i, --ip                Optionally include host ip addresses
       -v, --verbose           Display generated certificate
-      -f, --force-overwrite   Overwrite existing certificate files
+      -f, --force             Force overwrite of existing certificate files
 
       NOTE: You must be the superuser to run this script.
 
@@ -168,69 +163,73 @@ return
 }
 
 add_san() {
-  if [[ ! "$sans" =~ " $1 " ]]; then        # skip duplicates
-    echo "DNS.$((n++)) = $1" >> $TMPFILE    # add subject alternate name
-    sans+="$1 "
-  fi
+    if [[ ! "$sans" =~ " $1 " ]]; then        # skip duplicates
+        echo "DNS.$((n++)) = $1" >> $TMPFILE    # add subject alternate name
+        sans+="$1 "
+    fi
 }
 
 add_ip() {
-  echo "IP.$((i++)) = $1" >> $TMPFILE
+    echo "IP.$((i++)) = $1" >> $TMPFILE
 }
 
 create_temporary_cnf() {
-  n=1; i=1; sans=" "
+    n=1; i=1; sans=" "
 
-  # remove alt_names from template
-  sed -e '/^\[\s*alt_names\s*\]/q' $TEMPLATE > $TMPFILE
+    # remove alt_names from template
+    sed -e '/^\[\s*alt_names\s*\]/q' $TEMPLATE > $TMPFILE
 
-  if [[ $WILD == true ]]; then
-    [[ "$args" == "" ]] && args="$(hostname -Ad)"
-    for domain in $args; do
-      commonName=${commonName:-$domain};    # use first match
-      add_san "$domain";                    # domain
-      add_san "*.$domain";                  # wildcard
-    done
-  else
-    [[ "$args" == "" ]] && args="$(hostname -A)"
-    [[ "$args" == "" ]] && args="$(hostname)"
-    for fqdn in $args; do
-      commonName=${commonName:-$fqdn}      # use first match
+    if [[ $WILD == true ]]; then
+        [[ "$args" == "" ]] && args="$(hostname -Ad)"
+        for domain in $args; do
+            commonName=${commonName:-$domain};    # use first match
+            add_san "$domain";                    # domain
+            add_san "*.$domain";                  # wildcard
+        done
+    else
+        [[ "$args" == "" ]] && args="$(hostname -A)"
+        [[ "$args" == "" ]] && args="$(hostname)"
+        for fqdn in $args; do
+            commonName=${commonName:-$fqdn}      # use first match
 
-      add_san "$fqdn"                      # fqdn
-      add_san "${fqdn#*.}"                 # domain
-      add_san "${fqdn%%.*}"                # host
-    done
-  fi
+            add_san "$fqdn"                      # fqdn
+            add_san "${fqdn#*.}"                 # domain
+            add_san "${fqdn%%.*}"                # host
+        done
+    fi
 
-  if [[ $IP == true ]]; then
-    for addr in $(hostname -I) '127.0.0.1'; do add_san "$addr"; add_ip "$addr"; done
-  fi
-  # truncate common name if it's too long for openssl
-  if [[ "${#commonName}" -gt 18 ]]; then
-     commonName="${commonName:0:18}"
-  fi
-  sed -i "s#@HostName@#\"$commonName\"#" $TMPFILE
+    if [[ $IP == true ]]; then
+        for addr in $(hostname -I) '127.0.0.1'; do
+            add_san "$addr"; add_ip "$addr"
+        done
+    fi
+    # truncate common name if it's too long for openssl
+    if [[ "${#commonName}" -gt 18 ]]; then
+        commonName="${commonName:0:18}"
+    fi
+    sed -i "s#@HostName@#\"$commonName\"#" $TMPFILE
 }
 
 expiry_days() {
-  [ -z "$1" ] && error_exit "Expiry date not set"
-
-  number="${1//[a-z]}"
-  [[ "$number" =~ ^[0-9]+$ ]] || error_exit "$number in Expiry is not a valid integer"
-  ([ "$number" -lt 1 ] || [ "$number" -gt 10957 ]) \
-    && error_exit "$number in Expiry is out of bounds. Must be between 1 and 10957"
-
-  interval="${1//[0-9]}"
-  case "$interval" in
-    y) days=$((($(date -d "+$number year" +%s) - $(date +%s))/86400)) ;;
-    m) days=$((($(date -d "+$number month" +%s) - $(date +%s))/86400)) ;;
-    d) days=$((($(date -d "+$number day" +%s) - $(date +%s))/86400)) ;;
-    *) error_exit "$interval in Expiry not supported; use only d|m|y (days|months|years)."
-  esac
-
-  [ ! "$days" -lt 1 ] && [ ! "$days" -gt 10957 ] \
-    || error_exit "Expiry must be between 1 day (1d) and 30 years (10957d)"
+    num="${1//[dmy]}"
+    case $1 in
+        '')
+            error_exit "Expiry date not set"
+            ;;
+        *[!0-9]*)
+            error_exit "Expiry can only be digits (with d|m|y suffix) got: $1"
+            ;;
+    esac
+    interval="${1//[0-9]}"
+    case "$interval" in
+        y)  days=$((($(date -d "+$number year" +%s) - $(date +%s))/86400));;
+        m)  days=$((($(date -d "+$number month" +%s) - $(date +%s))/86400));;
+        d)  days=$((($(date -d "+$number day" +%s) - $(date +%s))/86400));;
+        *)  error_exit "Expiry $interval not recognised.";;
+    esac
+    if [[ "$days" -lt 1 ]] || [[ "$days" -gt 10957 ]]; then
+        error_exit "Expiry must be between 1 day (1d) and 30 years (10957d)"
+    fi
 }
 
 # Trap signals
@@ -239,37 +238,26 @@ trap "signal_exit INT"  INT
 
 # Parse command-line
 while [[ -n $1 ]]; do
-  case $1 in
-    -h | --help)              help_message; graceful_exit ;;
-    -o | --out)               shift; CERT="$1"; OUT=true ;;
-    -d | --default)           DEFAULT=true ; GEN_DH=true ;;
-    -e | --expiry)            shift; EXPIRY="$1" ;;
-    -b | --dh-bits)           shift; DH_BITS="$1" ; GEN_DH=true ;;
-    -p | --dh-params-only)    DH_ONLY=true; GEN_DH=true ;;
-    -r | --csr)               REQUEST=true ;;
-    -w | --wild)              WILD=true ;;
-    -t | --template)          shift; TEMPLATE="$1" ;;
-    -i | --ip)                IP=true ;;
-    -v | --verbose)           VERBOSE=true ;;
-    -f | --force-overwrite)   OVERWRITE=true ;;
-    -* | --*)                 usage; error_exit "Unknown option $1" ;;
-    *)                        args+="$1 " ;;
-  esac
-  shift
+    case $1 in
+        -h|--help)      help_message; graceful_exit;;
+        -o|--out)       shift; CERT="$1"; OUT=true;;
+        -d|--default)   DEFAULT=true; GEN_DH=true;;
+        -e|--expiry)    shift; EXPIRY="$1";;
+        -p|--dh-only)   DH_ONLY=true; GEN_DH=true;;
+        -r|--csr)       REQUEST=true;;
+        -w|--wild)      WILD=true;;
+        -t|--template)  shift; TEMPLATE="$1";;
+        -i|--ip)        IP=true;;
+        -v|--verbose)   VERBOSE=true;;
+        -f|--force)     OVERWRITE=true;;
+        -*|--*)         usage; error_exit "Unknown option $1";;
+        *)              args+="$1 ";;
+    esac
+    shift
 done
 
 if [[ $DH_ONLY == true ]]; then
     warning "--dh-params-only switch used, no cert or key files will be generated."
-fi
-if [[ $DH_BITS -ne 1024 ]] && [[ $DH_BITS -ne 2048 ]] \
-                                    && [[ $DH_BITS -ne 4096 ]]; then
-    error_exit "DH_BITS must be one of 1024, 2048 or 4096."
-elif [[ $DH_BITS -eq 1024 ]]; then
-    msg="DH_BITS of 1024 is not recommended and may leave https connections"
-    msg="$msg with your webserver vulnerable to attack. Unless you need to"
-    msg="$msg support really old clients (e.g. Windows XP, Internet Explorer"
-    msg="$msg <11, etc) use 2048 or 4096 bits."
-    warning "$msg"
 fi
 
 expiry_days $EXPIRY
@@ -279,12 +267,12 @@ which openssl > /dev/null || error_exit "OpenSSL is not installed."
 
 # Check for root UID
 if [[ $(id -u) != 0 ]]; then
-  error_exit "You must be the superuser to run this script."
+    error_exit "You must be the superuser to run this script."
 fi
 
 # Template file must exist
 if [[ ! -f $TEMPLATE ]]; then
-  error_exit "Could not open template file: $TEMPLATE"
+    error_exit "Could not open template file: $TEMPLATE"
 fi
 
 ## Main logic ##
@@ -296,21 +284,21 @@ create_temporary_cnf
 # assign file names
 DHP="$KEY_DIR/dhparams.pem"
 if [[ $DEFAULT == true ]] || [[ $DH_ONLY == true ]]; then
-  OUT=false    # ignore output file
-  CERT="$CERT_DIR/cert.crt"
-  KEY="$KEY_DIR/cert.key"
-  CSR="$KEY_DIR/cert.csr"
+    OUT=false    # ignore output file
+    CERT="$CERT_DIR/cert.crt"
+    KEY="$KEY_DIR/cert.key"
+    CSR="$KEY_DIR/cert.csr"
 elif [[ $OUT == false ]]; then
-  CERT="$CERT_DIR/$commonName.crt"
-  KEY="$KEY_DIR/$commonName.key"
-  CSR="$KEY_DIR/$commonName.csr"
+    CERT="$CERT_DIR/$commonName.crt"
+    KEY="$KEY_DIR/$commonName.key"
+    CSR="$KEY_DIR/$commonName.csr"
 else
-  # ensure user input cert name has extension pem or crt
-  shopt -s nocasematch
-  [[ ${CERT##*.} =~ (pem|crt) ]] || CERT+=".crt"
-  shopt -u nocasematch
-  KEY="${CERT%.*}.key"
-  CSR="${CERT%.*}.csr"
+    # ensure user input cert name has extension pem or crt
+    shopt -s nocasematch
+    [[ ${CERT##*.} =~ (pem|crt) ]] || CERT+=".crt"
+    shopt -u nocasematch
+    KEY="${CERT%.*}.key"
+    CSR="${CERT%.*}.csr"
 fi
 
 # don't overwrite existing key and/or cert files without permission
@@ -357,46 +345,46 @@ chmod 400 "$DHP"
 
 # create default cert.pem file, including dhparams
 if [[ $DEFAULT == true ]] || [[ $DH_ONLY == true ]]; then
-  cat "$CERT" "$KEY" "$DHP" > "$KEY_DIR/cert.pem"
-  chmod 400 "$KEY_DIR/cert.pem"
+    cat "$CERT" "$KEY" "$DHP" > "$KEY_DIR/cert.pem"
+    chmod 400 "$KEY_DIR/cert.pem"
 fi
 
 # create the certificate signing request.
 if [[ $REQUEST == true ]]; then
-  # warn if organizationName is "TurnKey GNU/Linux"
-  if [[ $(grep '^organizationName\s*=\s*"TurnKey GNU/Linux"' $TEMPLATE) ]]; then
+    # warn if organizationName is "TurnKey GNU/Linux"
+    if [[ $(grep '^organizationName\s*=\s*"TurnKey GNU/Linux"' $TEMPLATE) ]]; then
 
-cat << _EOF_ >&2
+cat >&2 <<EOF
 
 WARNING [${PROGNAME}]: organizationName = "TurnKey GNU/Linux"
     Unless you work for TurnKey, you probably want to edit the
     template file, /etc/ssl/turnkey.cnf or create a custom copy
     and use the [-t|--template] option.
 
-_EOF_
+EOF
 
-  fi
-  # create the certificate signing request.
-  if ! openssl req -sha256 -config $TMPFILE -new -key $KEY -out $CSR > $TMPOUT 2>&1
-  then
-    error_exit "Could not create CSR. Openssl output was:" $TMPOUT
-  fi
-  chmod 600 $CSR
+    fi
+    # create the certificate signing request.
+    if ! openssl req -sha256 -config $TMPFILE -new -key $KEY -out $CSR \
+        > $TMPOUT 2>&1; then
+        error_exit "Could not create CSR. Openssl output was:" $TMPOUT
+    fi
+    chmod 600 $CSR
 fi
 
 # rehash symlinks in /etc/ssl/certs
 if [[ $OUT == false ]]; then
-  update-ca-certificates
+    update-ca-certificates
 fi
 
 # handle verbose
 if [[ $VERBOSE == true ]]; then
-  # display the certificate
-  openssl x509 -noout -text -in $CERT
-  if [[ $REQUEST == true ]]; then
-    # display the certificate signing request.
-    openssl req -noout -text -in $CSR
-  fi
+    # display the certificate
+    openssl x509 -noout -text -in $CERT
+    if [[ $REQUEST == true ]]; then
+        # display the certificate signing request.
+        openssl req -noout -text -in $CSR
+    fi
 fi
 
 clean_up
