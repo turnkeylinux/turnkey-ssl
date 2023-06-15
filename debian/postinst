@@ -1,0 +1,16 @@
+#!/bin/sh -e
+
+ETC=/etc/ssl/private
+SHARE=/usr/share/turnkey-ssl
+
+for _file in cert.key cert.pem dhparams.pem; do
+    if [ ! -f "$ETC/$_file" ]; then
+        cp $SHARE/$_file $ETC/
+    fi
+    chmod 400 $ETC/$_file
+done
+chmod 700 $ETC
+
+#DEBHELPER#
+
+exit 0
