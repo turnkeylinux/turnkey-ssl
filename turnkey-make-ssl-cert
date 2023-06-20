@@ -148,6 +148,7 @@ $(usage)
       -i, --ip                Optionally include host ip addresses
       -v, --verbose           Display generated certificate
       -f, --force             Force overwrite of existing certificate files
+      --force-overwrite       [Deprecated] Same as -f|--force
 
       NOTE: You must be the superuser to run this script.
 
@@ -243,6 +244,10 @@ while [[ -n $1 ]]; do
         -t|--template)  shift; TEMPLATE="$1";;
         -i|--ip)        IP=true;;
         -v|--verbose)   VERBOSE=true;;
+        --force-overwrite)
+                        warning "Use of --force-overwrite is deprecated, use"\
+                                " -f|--force instead"
+                        OVERWRITE=true;;
         -f|--force)     OVERWRITE=true;;
         -*|--*)         usage; error_exit "Unknown option $1";;
         *)              args+="$1 ";;
