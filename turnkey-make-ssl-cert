@@ -66,6 +66,7 @@ OVERWRITE=false
 EXPIRY=10y
 GEN_DH=false
 DH_ONLY=false
+DH_BITS=${DH_BITS:-8192}
 
 clean_up() { # Perform pre-exit housekeeping
     [[ $DEBUG == y ]] || rm -f $TMPFILE $TMPOUT
@@ -131,26 +132,32 @@ $PROGNAME ver. $VERSION
 
 $(usage)
 
-      Options:
-      -h, --help              Display this help message and exit
-      -o, --out [/PATH/]FILE  Write certificate to alternate location
-      -d, --default           Generate default cert, key & dhparams files
-                                plus a combined file
-                                /etc/ssl/private/cert.pem
-      -e, --expiry            Set certificate expiry date
+Options:
+    -h|--help               Display this help message and exit
+    -o|--out [/PATH/]FILE   Write certificate to alternate location
+    -d|--default            Generate default cert, key & dhparams files plus a
+                                combined file /etc/ssl/private/cert.pem
+    -e|--expiry             Set certificate expiry date
                                 default: 10y
-      -p, --dh-only           Generate a Diffie-Hellman parameters file only
+    -p|--dh-only            Generate a Diffie-Hellman parameters file only
                                 (Also rebuilds default cert.pem file)
-      -r, --csr               Generate a certificate signing request
-      -w, --wild              Generate wildcard certificate
-      -t, --template FILE     Use alternate template file
+    -r|--csr                Generate a certificate signing request
+    -w|--wild               Generate wildcard certificate
+    -t|--template FILE      Use alternate template file
                                 default: /etc/ssl/turnkey.cnf
-      -i, --ip                Optionally include host ip addresses
-      -v, --verbose           Display generated certificate
-      -f, --force             Force overwrite of existing certificate files
-      --force-overwrite       [Deprecated] Same as -f|--force
+    -i|--ip                 Optionally include host ip addresses
+    -v|--verbose            Display generated certificate
+    -f|--force              Force overwrite of existing certificate files
+    --force-overwrite       [Deprecated] Same as -f|--force
 
       NOTE: You must be the superuser to run this script.
+
+En vars:
+
+    DH_BITS                 Bit size of Diffie-Hellman parameters to use,
+                            defaults to 8192 (other valid options are
+                            2048, 3072, 4096 or 6144)
+    DEBUG                   Verbose output (for debugging)
 
 EOF
 
