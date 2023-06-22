@@ -66,7 +66,7 @@ OVERWRITE=false
 EXPIRY=10y
 GEN_DH=false
 DH_ONLY=false
-DH_BITS=${DH_BITS:-8192}
+DH_BITS=${DH_BITS:-2048}
 
 clean_up() { # Perform pre-exit housekeeping
     [[ $DEBUG == y ]] || rm -f $TMPFILE $TMPOUT
@@ -155,8 +155,11 @@ Options:
 En vars:
 
     DH_BITS                 Bit size of Diffie-Hellman parameters to use,
-                            defaults to 8192 (other valid options are
-                            2048, 3072, 4096 or 6144)
+                            defaults to 2048 (recommended) although 3072
+                            should work ok and not slow things down too much
+                            Generally values of 4096 and higher are considered
+                            overkill. Valid options are: 2048, 3072, 4096,
+                            6144 and 8192.
     DEBUG                   Verbose output (for debugging)
 
 EOF
