@@ -7,7 +7,7 @@ Build-Depends:
 Standards-Version: 4.0.0
 
 Package: turnkey-ssl
-Architecture: any
+Architecture: all
 Depends:
  ${misc:Depends},
  sed,
