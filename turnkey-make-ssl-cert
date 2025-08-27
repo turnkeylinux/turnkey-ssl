@@ -56,7 +56,6 @@ CERT_DIR="/usr/local/share/ca-certificates"
 KEY_DIR="/etc/ssl/private"
 TEMPLATE="/etc/ssl/turnkey.cnf"
 DEFAULT=false
-LE=false
 IP=false
 OUT=false
 VERBOSE=false
@@ -69,16 +68,16 @@ DH_ONLY=false
 DH_BITS=${DH_BITS:-2048}
 
 clean_up() { # Perform pre-exit housekeeping
-    [[ $DEBUG == y ]] || rm -f $TMPFILE $TMPOUT
+    [[ $DEBUG == y ]] || rm -f "$TMPFILE" "$TMPOUT"
 }
 
-info() { echo "INFO [$PROGNAME]: $@"; }
-warning() { echo "WARNING [$PROGNAME]: $@" >&2 ; }
+info() { echo "INFO [$PROGNAME]: $*"; }
+warning() { echo "WARNING [$PROGNAME]: $*" >&2 ; }
 
 error_exit() {
-    echo -e ERROR [${PROGNAME}]: ${1:-"Unknown Error"} >&2
+    echo -e "ERROR [${PROGNAME}]: ${1:-"Unknown Error"}" >&2
     if [[ $2 ]] && [[ -f $2 ]]; then
-        cat $2 >&2
+        cat "$2" >&2
     fi
     clean_up
     exit 1
@@ -89,6 +88,7 @@ graceful_exit() {
     exit
 }
 
+# shellcheck disable=SC2317  # Don't warn about unreachable commands in this function
 signal_exit() { # Handle trapped signals
     case $1 in
         INT)    error_exit "Program interrupted by user";;
@@ -168,21 +168,21 @@ return
 }
 
 add_san() {
-    if [[ ! "$sans" =~ " $1 " ]]; then          # skip duplicates
-        echo "DNS.$((n++)) = $1" >> $TMPFILE    # add subject alternate name
+    if [[ ! "$sans" =~ $1 ]]; then          # skip duplicates
+        echo "DNS.$((n++)) = $1" >> "$TMPFILE"  # add subject alternate name
         sans+="$1 "
     fi
 }
 
 add_ip() {
-    echo "IP.$((i++)) = $1" >> $TMPFILE
+    echo "IP.$((i++)) = $1" >> "$TMPFILE"
 }
 
 create_temporary_cnf() {
     n=1; i=1; sans=" "
 
     # remove alt_names from template
-    sed -e '/^\[\s*alt_names\s*\]/q' $TEMPLATE > $TMPFILE
+    sed -e '/^\[\s*alt_names\s*\]/q' "$TEMPLATE" > "$TMPFILE"
 
     if [[ $WILD == true ]]; then
         [[ "$args" == "" ]] && args="$(hostname -Ad)"
@@ -212,12 +212,12 @@ create_temporary_cnf() {
     if [[ "${#commonName}" -gt 18 ]]; then
         commonName="${commonName:0:18}"
     fi
-    sed -i "s#@HostName@#\"$commonName\"#" $TMPFILE
+    sed -i "s#@HostName@#\"$commonName\"#" "$TMPFILE"
 }
 
 expiry_days() {
-    num="${1//[dmy]}"
-    case $num in
+    number="${1//[dmy]}"
+    case $number in
         '')
             error_exit "Expiry date not set"
             ;;
@@ -259,7 +259,7 @@ while [[ -n $1 ]]; do
                                 " -f|--force instead"
                         OVERWRITE=true;;
         -f|--force)     OVERWRITE=true;;
-        -*|--*)         usage; error_exit "Unknown option $1";;
+        --*|-*)         usage; error_exit "Unknown option $1";;
         *)              args+="$1 ";;
     esac
     shift
@@ -269,7 +269,7 @@ if [[ $DH_ONLY == true ]]; then
     warning "--dh-only switch used, no cert or key files will be generated."
 fi
 
-expiry_days $EXPIRY
+expiry_days "$EXPIRY"
 
 # Check for root UID
 if [[ $(id -u) != 0 ]]; then
@@ -325,22 +325,40 @@ fi
 # create the key and certificate.
 if [[ $DH_ONLY == false ]]; then
     info "Generating certificate and key files."
-    if ! openssl req -sha256 -config $TMPFILE -new -x509 -days $days \
-            -nodes -out $CERT -keyout $KEY > $TMPOUT 2>&1; then
-        error_exit "Could not create certificate. Openssl output was:" $TMPOUT
+    if ! openssl req -sha256 -config "$TMPFILE" -new -x509 -days $days \
+            -nodes -out "$CERT" -keyout "$KEY" > "$TMPOUT" 2>&1; then
+        error_exit "Could not create certificate. Openssl output was:" "$TMPOUT"
     fi
 fi
 
 # gen dhparams.
 if [[ "$GEN_DH" == "true" ]]; then
-    msg="Generating Diffie-Hellman parameters file - using predifined"
-    msg="$msg parameters as per RFC7919."
-    info "$msg"
+    error=
+    msg="Generating Diffie-Hellman parameters file is not required for TLS1.3."
+    case "$DH_BITS" in
+        1024)
+            msg="$msg DH_BITS=1024 is considered insecure and should only"
+            msg="$msg be used if support is NEEDED for legacy software"
+            ;;
+        2048)
+            msg="$msg Using predefined 2048 bit parameters as per RFC7919."
+            msg="$msg This will support TLS1.2. If support for legacy software"
+            msg="$msg is required, rerun with DH_BITS=1024 (not recommended)"
+            ;;
+        *)
+            msg="$msg Only DH parameters of 1024 or 2048 bits are supported."
+            error=true
+            ;;
+    esac
+    if [[ "$error" == "true" ]]; then
+        error_exit "$msg"
+    fi
+    warning "$msg"
     if ! openssl genpkey -genparam -algorithm DH \
-                -pkeyopt dh_param:ffdhe$DH_BITS -out $DHP \
-                -outform PEM > $TMPOUT 2>&1; then
+                -pkeyopt "dh_param:ffdhe$DH_BITS" -out "$DHP" \
+                -outform PEM > "$TMPOUT" 2>&1; then
         msg="Diffie-Hellman parameter generation failed.  OpenSSL output: "
-        error_exit "$msg" $TMPOUT
+        error_exit "$msg" "$TMPOUT"
     fi
 fi
 
@@ -358,8 +376,7 @@ fi
 # create the certificate signing request.
 if [[ $REQUEST == true ]]; then
     # warn if organizationName is "TurnKey GNU/Linux"
-    if [[ $(grep '^organizationName\s*=\s*"TurnKey GNU/Linux"' $TEMPLATE) ]]; then
-
+    if grep '^organizationName\s*=\s*"TurnKey GNU/Linux"' "$TEMPLATE"; then
 cat >&2 <<EOF
 
 WARNING [${PROGNAME}]: organizationName = "TurnKey GNU/Linux"
@@ -368,14 +385,13 @@ WARNING [${PROGNAME}]: organizationName = "TurnKey GNU/Linux"
     and use the [-t|--template] option.
 
 EOF
-
     fi
     # create the certificate signing request.
-    if ! openssl req -sha256 -config $TMPFILE -new -key $KEY -out $CSR \
-        > $TMPOUT 2>&1; then
-        error_exit "Could not create CSR. Openssl output was:" $TMPOUT
+    if ! openssl req -sha256 -config "$TMPFILE" -new -key "$KEY" -out "$CSR" \
+        > "$TMPOUT" 2>&1; then
+        error_exit "Could not create CSR. Openssl output was:" "$TMPOUT"
     fi
-    chmod 600 $CSR
+    chmod 600 "$CSR"
 fi
 
 # rehash symlinks in /etc/ssl/certs
@@ -386,10 +402,10 @@ fi
 # handle verbose
 if [[ $VERBOSE == true ]]; then
     # display the certificate
-    openssl x509 -noout -text -in $CERT
+    openssl x509 -noout -text -in "$CERT"
     if [[ $REQUEST == true ]]; then
         # display the certificate signing request.
-        openssl req -noout -text -in $CSR
+        openssl req -noout -text -in "$CSR"
     fi
 fi
 
